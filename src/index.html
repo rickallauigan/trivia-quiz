@@ -290,14 +290,6 @@
 
       var token = '{{ channel_id }}';
 
-      /*
-      var server = 'http://talkgadgetdev.corp.google.com';
-      var xpc = new chat.WcsCrossPageChannel(
-          token,
-          '/xcp_blank', undefined, server);
-      var handler = {};
-      var socket = new goog.appengine.Socket(token, handler, xpc);
-      */
       var channel = new goog.appengine.Channel(token);
       var socket = channel.open();
       socket.onopen = function() {
@@ -390,7 +382,7 @@
           Nobody has answered a question yet.
         </div>
       </div>
-</div>
+      </div>
       <div id='stats-area' class='ui-panel'>
         <div id='activity-stream'>
           <div class='stats-heading'>
