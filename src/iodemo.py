@@ -1,4 +1,10 @@
-"""Trivia Quiz
+#!/usr/bin/python2.4
+#
+# Copyright 2010 Google Inc. All Rights Reserved.
+
+# pylint: disable-msg=C6310
+
+"""Trivia Quiz.
 
 This module demonstrates the App Engine Channel API by implementing a
 multiplayer trivia quiz.
@@ -17,7 +23,6 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 
-""" All the questions for the quiz. """
 questions = [
     {'q': "When Google's founders were at Stanford, what was the name they gave their search engine?", 'a': ['BackRub', 'Linkerator', 'Alta Vista', 'Googol']},
     {'q': "What University were Google's co-founders studying at when they started Google?", 'a': ['Stanford', 'Princeton', 'MIT', 'The Evergreen State College']},
@@ -54,24 +59,27 @@ class UserData(db.Expando):
 
 class Broadcaster(object):
   """Sends a message to all users within the given user's shard."""
+
   def __init__(self, sending_user):
     self.sending_user = sending_user
 
   def BroadcastMessage(self, message):
+    """Send the given message to all users in this user's shard."""
     users_in_shard = db.GqlQuery("SELECT * FROM UserData where shard = :shard",
-                        shard=self.sending_user.shard)
+                                 shard=self.sending_user.shard)
     for user in users_in_shard:
-      if (datetime.datetime.now() - user.last_update_time 
-          > datetime.timedelta(hours = 1)):
+      if (datetime.datetime.now() - user.last_update_time
+          > datetime.timedelta(hours=1)):
         logging.info("Removing user: " + user.display_name)
         user.delete()
       else:
-        if (self.sending_user == None or
+        if (self.sending_user is None or
             user.user.user_id() != self.sending_user.user.user_id()):
           messager = UserMessager(user.user.user_id())
           messager.Send(message)
 
   def GetScores(self):
+    """Send the scores in this shard to the user."""
     users_in_shard = db.GqlQuery("SELECT * FROM UserData where shard = :shard",
                                  shard=self.sending_user.shard)
     scores = []
@@ -84,7 +92,7 @@ class Broadcaster(object):
     return scores[:8]
 
 
-class UserMessager:
+class UserMessager(object):
   """Sends a message to a given user."""
 
   def __init__(self, user_id):
@@ -97,21 +105,22 @@ class UserMessager:
   def Send(self, message):
     channel.send_message(self.user, simplejson.dumps(message))
 
-  def SendNewQuestionToUser(self, user_data, opt_message = None):
-    if (user_data != None):
-      if (user_data.available_questions == []):
+  def SendNewQuestionToUser(self, user_data, opt_message=None):
+    """Send a new question to the given user."""
+    if user_data is not None:
+      if not user_data.available_questions:
         question_id = -1
       else:
         question_id = random.choice(user_data.available_questions)
     else:
       question_id = random.randint(0, len(questions) - 1)
 
-    if (opt_message == None):
+    if opt_message is None:
       message = {}
     else:
       message = opt_message
 
-    if (question_id >= 0):
+    if question_id >= 0:
       message['q'] = {
           'id': question_id,
           'q': questions[question_id]['q'],
@@ -126,8 +135,9 @@ class UserMessager:
 
 class AnswerPage(webapp.RequestHandler):
   """The client posts an answer to a question to this page."""
-  
+
   def post(self):
+    """Handles an answer to a question."""
     user = users.get_current_user()
     if user:
       messager = UserMessager(user.user_id())
@@ -166,7 +176,7 @@ class ConnectedPage(webapp.RequestHandler):
     user = users.get_current_user()
     if user:
       user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
-                             available_questions=range(0, len(questions) - 1))
+                                         available_questions=range(0, len(questions) - 1))
       messager = UserMessager(user.user_id())
       messager.SendNewQuestionToUser(user_data)
 
@@ -189,6 +199,7 @@ class StartOverPage(webapp.RequestHandler):
   """Page to indicate a user wants to start the quiz over."""
 
   def post(self):
+    """Starts the game over for the current user."""
     user = users.get_current_user()
     if user:
       user_data = UserData.get_or_insert(user.user_id())
@@ -203,6 +214,7 @@ class MainPage(webapp.RequestHandler):
   """The main UI page, renders the 'index.html' template."""
 
   def get(self):
+    """Renders the main page."""
     user = users.get_current_user()
     if user:
       messager = UserMessager(user.user_id())
@@ -226,13 +238,11 @@ class MainPage(webapp.RequestHandler):
 
 
 application = webapp.WSGIApplication([
-                                        ('/', MainPage),
-                                        ('/answer', AnswerPage),
-                                        ('/setname', SetNamePage),
-                                        ('/startover', StartOverPage),
-                                        ('/connected', ConnectedPage)
-                                     ],
-                                     debug=True)
+    ('/', MainPage),
+    ('/answer', AnswerPage),
+    ('/setname', SetNamePage),
+    ('/startover', StartOverPage),
+    ('/connected', ConnectedPage)], debug=True)
 
 
 def main():
