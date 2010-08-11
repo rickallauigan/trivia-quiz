@@ -85,94 +85,101 @@ class Broadcaster(object):
 
 
 class UserMessager:
-    def __init__(self, user_id):
-      self.user = user_id
+  """Sends a message to a given user."""
 
-    def CreateChannelId(self):
-      logging.info("Create channel: " + self.user)
-      return channel.create_channel(self.user)
+  def __init__(self, user_id):
+    self.user = user_id
 
-    def Send(self, message):
-      channel.send_message(self.user, simplejson.dumps(message))
+  def CreateChannelId(self):
+    logging.info("Create channel: " + self.user)
+    return channel.create_channel(self.user)
 
-    def SendNewQuestionToUser(self, user_data, opt_message = None):
-      if (user_data != None):
-        if (user_data.available_questions == []):
-          question_id = -1
-        else:
-          question_id = random.choice(user_data.available_questions)
+  def Send(self, message):
+    channel.send_message(self.user, simplejson.dumps(message))
+
+  def SendNewQuestionToUser(self, user_data, opt_message = None):
+    if (user_data != None):
+      if (user_data.available_questions == []):
+        question_id = -1
       else:
-        question_id = random.randint(0, len(questions) - 1)
+        question_id = random.choice(user_data.available_questions)
+    else:
+      question_id = random.randint(0, len(questions) - 1)
 
-      if (opt_message == None):
-        message = {}
-      else:
-        message = opt_message
+    if (opt_message == None):
+      message = {}
+    else:
+      message = opt_message
 
-      if (question_id >= 0):
-        message['q'] = {
-            'id': question_id,
-            'q': questions[question_id]['q'],
-            'a': questions[question_id]['a'][:]
-        }
-        random.shuffle(message['q']['a'])
-      else:
-        message['c'] = True
+    if (question_id >= 0):
+      message['q'] = {
+          'id': question_id,
+          'q': questions[question_id]['q'],
+          'a': questions[question_id]['a'][:]
+      }
+      random.shuffle(message['q']['a'])
+    else:
+      message['c'] = True
 
-      self.Send(message)
+    self.Send(message)
 
 
 class AnswerPage(webapp.RequestHandler):
-    def post(self):
-      user = users.get_current_user()
-      if user:
-        messager = UserMessager(user.user_id())
-        question_id = int(self.request.get('q'))
-        update_message = None
-        user_data = UserData.get_by_key_name(user.user_id())
-
-        if (user_data.available_questions.count(question_id) > 0):
-          answer = self.request.get('a')
-          correct_answer = questions[question_id]['a'][0]
-          was_correct = answer == correct_answer
-
-          if (was_correct):
-            user_data.score += 1
-          user_data.available_questions.remove(question_id)
-          db.put(user_data)
-          update_message = {'a': {'type': 'r',
-                                  'u': user_data.display_name,
-                                  'r': was_correct,
-                                  's': user_data.score,
-                                  'q': questions[question_id]['q']},
-                            's': Broadcaster(user_data).GetScores()}
-          Broadcaster(user_data).BroadcastMessage(update_message)
-          update_message['r'] = {'c': was_correct, 'a': correct_answer}
-
-        messager.SendNewQuestionToUser(user_data, update_message)
-        self.response.out.write('ok')
-      else:
-        self.response.set_status(401);
-
-
-class ConnectedPage(webapp.RequestHandler):
+  """The client posts an answer to a question to this page."""
+  
   def post(self):
     user = users.get_current_user()
     if user:
-      user_data = UserData.get_or_insert(user.user_id(), user = user, score = 0,
-                             available_questions = range(0, len(questions) - 1));
+      messager = UserMessager(user.user_id())
+      question_id = int(self.request.get('q'))
+      update_message = None
+      user_data = UserData.get_by_key_name(user.user_id())
+
+      if user_data.available_questions.count(question_id) > 0:
+        answer = self.request.get('a')
+        correct_answer = questions[question_id]['a'][0]
+        was_correct = answer == correct_answer
+
+        if was_correct:
+          user_data.score += 1
+        user_data.available_questions.remove(question_id)
+        db.put(user_data)
+        update_message = {'a': {'type': 'r',
+                                'u': user_data.display_name,
+                                'r': was_correct,
+                                's': user_data.score,
+                                'q': questions[question_id]['q']},
+                          's': Broadcaster(user_data).GetScores()}
+        Broadcaster(user_data).BroadcastMessage(update_message)
+        update_message['r'] = {'c': was_correct, 'a': correct_answer}
+
+      messager.SendNewQuestionToUser(user_data, update_message)
+      self.response.out.write('ok')
+    else:
+      self.response.set_status(401)
+
+
+class ConnectedPage(webapp.RequestHandler):
+  """This page is requested when the client is successfully connected to the channel."""
+
+  def post(self):
+    user = users.get_current_user()
+    if user:
+      user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
+                             available_questions=range(0, len(questions) - 1))
       messager = UserMessager(user.user_id())
       messager.SendNewQuestionToUser(user_data)
 
 
 class SetNamePage(webapp.RequestHandler):
   """Page to set the display name of the user."""
+
   def post(self):
     user = users.get_current_user()
     if user:
       user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
-          available_questions=range(0, len(questions) - 1),
-          shard=UserData.all().count() / 10);
+                                         available_questions=range(0, len(questions) - 1),
+                                         shard=UserData.all().count() / 10)
       user_data.display_name = self.request.get('n')
       db.put(user_data)
       Broadcaster(user_data).BroadcastMessage({'a': {'type': 'j', 'u': user_data.display_name}})
@@ -180,6 +187,7 @@ class SetNamePage(webapp.RequestHandler):
 
 class StartOverPage(webapp.RequestHandler):
   """Page to indicate a user wants to start the quiz over."""
+
   def post(self):
     user = users.get_current_user()
     if user:
@@ -188,12 +196,12 @@ class StartOverPage(webapp.RequestHandler):
       user_data.score = 0
       user_data.available_questions = range(0, len(questions) - 1)
       db.put(user_data)
-      UserMessager(user.user_id()).SendNewQuestionToUser(user_data,
-          {'s': Broadcaster(user_data).GetScores()})
+      UserMessager(user.user_id()).SendNewQuestionToUser(user_data, {'s': Broadcaster(user_data).GetScores()})
 
 
 class MainPage(webapp.RequestHandler):
   """The main UI page, renders the 'index.html' template."""
+
   def get(self):
     user = users.get_current_user()
     if user:
@@ -202,7 +210,7 @@ class MainPage(webapp.RequestHandler):
       user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
                                          available_questions=range(0, len(questions) - 1),
                                          display_name=user.nickname(),
-                                         shard=UserData.all().count() / 10);
+                                         shard=UserData.all().count() / 10)
       if user_data.display_name is not None:
         nickname = user_data.display_name
       else:
@@ -218,11 +226,11 @@ class MainPage(webapp.RequestHandler):
 
 
 application = webapp.WSGIApplication([
-                                      ('/', MainPage),
-                                      ('/answer', AnswerPage),
-                                      ('/setname', SetNamePage),
-                                      ('/startover', StartOverPage),
-                                      ('/connected', ConnectedPage)
+                                        ('/', MainPage),
+                                        ('/answer', AnswerPage),
+                                        ('/setname', SetNamePage),
+                                        ('/startover', StartOverPage),
+                                        ('/connected', ConnectedPage)
                                      ],
                                      debug=True)
 
