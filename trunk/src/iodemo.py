@@ -163,14 +163,6 @@ class ConnectedPage(webapp.RequestHandler):
       messager.SendNewQuestionToUser(user_data)
 
 
-class PingPage(webapp.RequestHandler):
-  def post(self):
-    user = users.get_current_user()
-    if user:
-      messager = UserMessager(user.user_id())
-      messager.Send({'pong': True})
-
-
 class SetNamePage(webapp.RequestHandler):
   def post(self):
     user = users.get_current_user()
@@ -224,8 +216,7 @@ application = webapp.WSGIApplication([('/', MainPage),
                                       ('/answer', AnswerPage),
                                       ('/setname', SetNamePage),
                                       ('/startover', StartOverPage),
-                                      ('/connected', ConnectedPage),
-                                      ('/ping', PingPage)], debug=True)
+                                      ('/connected', ConnectedPage)], debug=True)
 
 
 def main():
