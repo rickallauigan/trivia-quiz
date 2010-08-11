@@ -17,7 +17,7 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 
-#class Questions(object):
+""" All the questions for the quiz. """
 questions = [
     {'q': "When Google's founders were at Stanford, what was the name they gave their search engine?", 'a': ['BackRub', 'Linkerator', 'Alta Vista', 'Googol']},
     {'q': "What University were Google's co-founders studying at when they started Google?", 'a': ['Stanford', 'Princeton', 'MIT', 'The Evergreen State College']},
@@ -43,6 +43,7 @@ questions = [
 
 
 class UserData(db.Expando):
+  """All the data we store with a given user."""
   user = db.UserProperty()
   display_name = db.StringProperty()
   score = db.IntegerProperty()
@@ -52,6 +53,7 @@ class UserData(db.Expando):
 
 
 class Broadcaster(object):
+  """Sends a message to all users within the given user's shard."""
   def __init__(self, sending_user):
     self.sending_user = sending_user
 
@@ -109,9 +111,9 @@ class UserMessager:
 
       if (question_id >= 0):
         message['q'] = {
-          'id': question_id,
-          'q': questions[question_id]['q'],
-          'a': questions[question_id]['a'][:]
+            'id': question_id,
+            'q': questions[question_id]['q'],
+            'a': questions[question_id]['a'][:]
         }
         random.shuffle(message['q']['a'])
       else:
@@ -139,10 +141,10 @@ class AnswerPage(webapp.RequestHandler):
           user_data.available_questions.remove(question_id)
           db.put(user_data)
           update_message = {'a': {'type': 'r',
-                                   'u': user_data.display_name,
-                                   'r': was_correct,
-                                   's': user_data.score,
-                                   'q': questions[question_id]['q']},
+                                  'u': user_data.display_name,
+                                  'r': was_correct,
+                                  's': user_data.score,
+                                  'q': questions[question_id]['q']},
                             's': Broadcaster(user_data).GetScores()}
           Broadcaster(user_data).BroadcastMessage(update_message)
           update_message['r'] = {'c': was_correct, 'a': correct_answer}
