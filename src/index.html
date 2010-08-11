@@ -1,7 +1,6 @@
 <html>
   <head>
       <script src='/_ah/channel/jsapi'></script>
-<!--      <script src='http://talkgadget.google.com/talkgadget/channel.js'></script> -->
       <style type='text/css'>
         div {
           overflow: hidden;
@@ -293,14 +292,10 @@
       var channel = new goog.appengine.Channel(token);
       var socket = channel.open();
       socket.onopen = function() {
-        ping = window.setInterval(function() {sendMessage('ping')}, 2000);
+        window.setTimeout(function() {sendMessage('connected')}, 100);
       }
       socket.onmessage = function(evt) {
           var o = JSON.parse(evt.data);
-          if (o.pong) {
-            window.clearInterval(ping);
-            sendMessage('connected');
-          }
 
           if (o.c) {
             showComplete();
