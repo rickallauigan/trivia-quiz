@@ -166,63 +166,69 @@ class ConnectedPage(webapp.RequestHandler):
 
 
 class SetNamePage(webapp.RequestHandler):
+  """Page to set the display name of the user."""
   def post(self):
     user = users.get_current_user()
     if user:
-      user_data = UserData.get_or_insert(user.user_id(), user = user, score = 0,
-                             available_questions = range(0, len(questions) - 1),
-                             shard = UserData.all().count() / 10);
+      user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
+          available_questions=range(0, len(questions) - 1),
+          shard=UserData.all().count() / 10);
       user_data.display_name = self.request.get('n')
       db.put(user_data)
-      Broadcaster(user_data).BroadcastMessage({'a': {'type': 'j',
-                                                      'u': user_data.display_name}})
+      Broadcaster(user_data).BroadcastMessage({'a': {'type': 'j', 'u': user_data.display_name}})
 
 
 class StartOverPage(webapp.RequestHandler):
+  """Page to indicate a user wants to start the quiz over."""
   def post(self):
     user = users.get_current_user()
     if user:
-      user_data = UserData.get_or_insert(user.user_id());
+      user_data = UserData.get_or_insert(user.user_id())
       user_data.user = user
       user_data.score = 0
       user_data.available_questions = range(0, len(questions) - 1)
       db.put(user_data)
       UserMessager(user.user_id()).SendNewQuestionToUser(user_data,
-                                                         {'s': Broadcaster(user_data).GetScores()})
+          {'s': Broadcaster(user_data).GetScores()})
 
 
 class MainPage(webapp.RequestHandler):
-    def get(self):
-        user = users.get_current_user()
-        if user:
-          messager = UserMessager(user.user_id())
-          id = messager.CreateChannelId()
-          user_data = UserData.get_or_insert(user.user_id(), user = user, score = 0,
-                                 available_questions = range(0, len(questions) - 1),
-                                 display_name = user.nickname(),
-                                 shard = UserData.all().count() / 10);
-          if (user_data.display_name != None):
-            nickname = user_data.display_name
-          else:
-            nickname = user.nickname()
-          template_values = {'channel_id': id,
-                             'nickname': nickname,
-                             'initial_messages': simplejson.dumps({'s': Broadcaster(user_data).GetScores()})}
-          path = os.path.join(os.path.dirname(__file__), 'index.html')
-          self.response.out.write(template.render(path, template_values))
-        else:
-          self.redirect(users.create_login_url(self.request.uri))
+  """The main UI page, renders the 'index.html' template."""
+  def get(self):
+    user = users.get_current_user()
+    if user:
+      messager = UserMessager(user.user_id())
+      channel_id = messager.CreateChannelId()
+      user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
+                                         available_questions=range(0, len(questions) - 1),
+                                         display_name=user.nickname(),
+                                         shard=UserData.all().count() / 10);
+      if user_data.display_name is not None:
+        nickname = user_data.display_name
+      else:
+        nickname = user.nickname()
+      template_values = {'channel_id': channel_id,
+                         'nickname': nickname,
+                         'initial_messages': simplejson.dumps(
+                             {'s': Broadcaster(user_data).GetScores()})}
+      path = os.path.join(os.path.dirname(__file__), 'index.html')
+      self.response.out.write(template.render(path, template_values))
+    else:
+      self.redirect(users.create_login_url(self.request.uri))
 
 
-application = webapp.WSGIApplication([('/', MainPage),
+application = webapp.WSGIApplication([
+                                      ('/', MainPage),
                                       ('/answer', AnswerPage),
                                       ('/setname', SetNamePage),
                                       ('/startover', StartOverPage),
-                                      ('/connected', ConnectedPage)], debug=True)
+                                      ('/connected', ConnectedPage)
+                                     ],
+                                     debug=True)
 
 
 def main():
-    run_wsgi_app(application)
+  run_wsgi_app(application)
 
 if __name__ == "__main__":
-    main()
+  main()
