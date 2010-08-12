@@ -8,6 +8,28 @@
 
 This module demonstrates the App Engine Channel API by implementing a
 multiplayer trivia quiz.
+
+The basic program flow is this:
+
+A user visits the main page (eg. http://io-trivia-quiz.appspot.com/) in
+their browser.
+
+This request is sent to MainPage.get() which calls channel.create_channel()
+with the user's id as the channel id. The token returned by create_channel()
+is passed into the index.html template.
+
+The token is used by the javascript in index.html to create a new 
+goog.appengine.Channel object and open a socket on that channel. When the javascript
+client receives the 'onopen' callback on the socket, it POSTs to the application's
+/connected path.
+
+The post to /connected causes the application to send a message over the channel to
+the client with a new question.
+
+The client renders the new question. When the user pushes a button to answer the
+question, the client POSTs to the /answer path. The /answer handler broadcasts the
+result of this answer to all users in the current user's shard, and sends a new
+message to the client that answered the message.
 """
 
 import datetime
@@ -98,11 +120,16 @@ class UserMessager(object):
   def __init__(self, user_id):
     self.user = user_id
 
-  def CreateChannelId(self):
+  def CreateChannelToken(self):
+    """Create a new channel token to let a client connect to a channel. We create
+    a channel per user with the assumption that there is one client per user. More
+    advanced applications could create more finely-grained channels to support multiple
+    clients per user."""
     logging.info("Create channel: " + self.user)
     return channel.create_channel(self.user)
 
   def Send(self, message):
+    """Send a message to the client associated with the user."""
     channel.send_message(self.user, simplejson.dumps(message))
 
   def SendNewQuestionToUser(self, user_data, opt_message=None):
@@ -214,11 +241,12 @@ class MainPage(webapp.RequestHandler):
   """The main UI page, renders the 'index.html' template."""
 
   def get(self):
-    """Renders the main page."""
+    """Renders the main page. When this page is shown, we create a new
+    channel to push asynchronous updates to the client."""
     user = users.get_current_user()
     if user:
       messager = UserMessager(user.user_id())
-      channel_id = messager.CreateChannelId()
+      channel_token = messager.CreateChannelToken()
       user_data = UserData.get_or_insert(user.user_id(), user=user, score=0,
                                          available_questions=range(0, len(questions) - 1),
                                          display_name=user.nickname(),
@@ -227,7 +255,7 @@ class MainPage(webapp.RequestHandler):
         nickname = user_data.display_name
       else:
         nickname = user.nickname()
-      template_values = {'channel_id': channel_id,
+      template_values = {'channel_id': channel_token,
                          'nickname': nickname,
                          'initial_messages': simplejson.dumps(
                              {'s': Broadcaster(user_data).GetScores()})}
