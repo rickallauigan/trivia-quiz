@@ -1,0 +1,1 @@
+This project demonstrates how to use the new App Engine channel API in Python. It's a simple demo that lets multiple people play a trivia game and broadcasts updates to players about the state of the game (when people join, when they answer questions, ongoing scores, etc.)
